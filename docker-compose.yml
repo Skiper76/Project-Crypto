@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  app:
+    build: 
+      context: ./S1
+      dockerfile: Dockerfile
+    stdin_open: true  
+    tty: true         
+    ports:
+      - "5000:5000"
+    depends_on:
+      - hsm
+
+  hsm:
+    build: 
+      context: ./S2
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
