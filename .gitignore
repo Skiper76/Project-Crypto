@@ -1,0 +1,9 @@
+# Ignore private keys
+*.pem
+
+# Ignore all environment files
+.env
+
+# Ignore specific sensitive files
+/S1/key.pem
+/S2/key.pem
