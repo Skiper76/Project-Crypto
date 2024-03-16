@@ -3,16 +3,47 @@
 import bcrypt
 import getpass
 import requests  # Pour envoyer des requêtes HTTP au HSM
+import json
+import os
+import ssl
 
-user_database = {}
+# Paramètres de configuration
+USER_DATABASE_FILE = 'user_database.json'
+SALT_ROUNDS = 12  # Plus de rounds signifie un hachage plus sécurisé mais plus lent
+
+# Charger ou initialiser la base de données utilisateur
+if os.path.exists(USER_DATABASE_FILE):
+    with open(USER_DATABASE_FILE, 'r') as file:
+        user_database = json.load(file)
+else:
+    user_database = {}
+
+def save_user_database():
+    with open(USER_DATABASE_FILE, 'w') as file:
+        json.dump(user_database, file)
 
 def encrypt_password(hashed_password):
-    response = requests.post('http://hsm:8081/encrypt', json={'data': hashed_password.hex()})
+    response = requests.post('https://hsm:8081/encrypt', json={'data': hashed_password.hex()})
     return bytes.fromhex(response.json()['encrypted'])
 
 def decrypt_password(encrypted_hashed_password):
-    response = requests.post('http://hsm:8081/decrypt', json={'data': encrypted_hashed_password.hex()})
+    response = requests.post('https://hsm:8081/decrypt', json={'data': encrypted_hashed_password.hex()})
     return bytes.fromhex(response.json()['decrypted'])
+
+def calculate_entropy(password):
+    charset_size = (
+        (26 if any(c.islower() for c in password) else 0) + 
+        (26 if any(c.isupper() for c in password) else 0) + 
+        (10 if any(c.isdigit() for c in password) else 0) + 
+        (32 if any(c in '!@#$%^&*()-_+=' for c in password) else 0)  # Estimation pour caractères spéciaux
+    )
+    entropy = len(password) * charset_size.bit_length()
+    return entropy
+
+def is_password_strong(password):
+    MIN_ENTROPY = 80
+    entropy = calculate_entropy(password)
+    return entropy >= MIN_ENTROPY
 
 def register_user():
     username = input("Enter your username for registration: ")
@@ -20,9 +51,13 @@ def register_user():
         print("Username already exists. Please try a different username.")
         return
     password = getpass.getpass("Enter your password for registration: ")
-    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    if not is_password_strong(password):
+        print("Password is not strong enough.")
+        return
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(SALT_ROUNDS))
     encrypted_hashed_password = encrypt_password(hashed_password)
-    user_database[username] = encrypted_hashed_password
+    user_database[username] = encrypted_hashed_password.hex()
+    save_user_database()
     print("Registration successful!")
 
 def login_user():
@@ -32,7 +67,7 @@ def login_user():
         return
     password = getpass.getpass("Enter your password for login: ")
     encrypted_hashed_password = user_database[username]
-    hashed_password = decrypt_password(encrypted_hashed_password)
+    hashed_password = decrypt_password(bytes.fromhex(encrypted_hashed_password))
     if bcrypt.checkpw(password.encode('utf-8'), hashed_password):
         print("Login successful!")
     else:
@@ -49,10 +84,13 @@ def main():
         elif choice == "2":
             login_user()
         elif choice == "3":
-            print("Exiting program.")
             break
         else:
             print("Invalid choice. Please try again.")
+    save_user_database()
 
 if __name__ == "__main__":
+    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+    context.load_cert_chain('cert.pem', 'key.pem')
+    app.run(host='0.0.0.0', port=8081, ssl_context=context)
     main()
