@@ -1,15 +1,13 @@
-#File "app.py" in ./S1
-
 import bcrypt
 import getpass
-import requests  # Pour envoyer des requêtes HTTP au HSM
+import requests
 import json
 import os
 import ssl
 
 # Paramètres de configuration
 USER_DATABASE_FILE = 'user_database.json'
-SALT_ROUNDS = 12  # Plus de rounds signifie un hachage plus sécurisé mais plus lent
+SALT_ROUNDS = 12
 
 # Charger ou initialiser la base de données utilisateur
 if os.path.exists(USER_DATABASE_FILE):
@@ -23,11 +21,11 @@ def save_user_database():
         json.dump(user_database, file)
 
 def encrypt_password(hashed_password):
-    response = requests.post('https://hsm:8081/encrypt', json={'data': hashed_password.hex()})
+    response = requests.post('https://hsm:8081/encrypt', json={'data': hashed_password.hex()}, verify="cert.pem")
     return bytes.fromhex(response.json()['encrypted'])
 
 def decrypt_password(encrypted_hashed_password):
-    response = requests.post('https://hsm:8081/decrypt', json={'data': encrypted_hashed_password.hex()})
+    response = requests.post('https://hsm:8081/decrypt', json={'data': encrypted_hashed_password.hex()}, verify="cert.pem")
     return bytes.fromhex(response.json()['decrypted'])
 
 def calculate_entropy(password):
@@ -35,15 +33,21 @@ def calculate_entropy(password):
         (26 if any(c.islower() for c in password) else 0) + 
         (26 if any(c.isupper() for c in password) else 0) + 
         (10 if any(c.isdigit() for c in password) else 0) + 
-        (32 if any(c in '!@#$%^&*()-_+=' for c in password) else 0)  # Estimation pour caractères spéciaux
+        (32 if any(c in '!@#$%^&*()-_+=' for c in password) else 0)
     )
     entropy = len(password) * charset_size.bit_length()
     return entropy
 
-def is_password_strong(password):
-    MIN_ENTROPY = 80
+def evaluate_password_strength(password):
     entropy = calculate_entropy(password)
-    return entropy >= MIN_ENTROPY
+    if entropy < 64:
+        return 'faible'
+    elif entropy < 80:
+        return 'correct'
+    elif entropy < 100:
+        return 'sûr'
+    else:
+        return 'très sûr'
 
 def register_user():
     username = input("Enter your username for registration: ")
@@ -51,8 +55,10 @@ def register_user():
         print("Username already exists. Please try a different username.")
         return
     password = getpass.getpass("Enter your password for registration: ")
-    if not is_password_strong(password):
-        print("Password is not strong enough.")
+    strength = evaluate_password_strength(password)
+    print(f"Strength of your password: {strength}.")
+    if strength == 'faible':
+        print("Password is too weak. Please use a stronger password.")
         return
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(SALT_ROUNDS))
     encrypted_hashed_password = encrypt_password(hashed_password)
@@ -90,7 +96,4 @@ def main():
     save_user_database()
 
 if __name__ == "__main__":
-    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-    context.load_cert_chain('cert.pem', 'key.pem')
-    app.run(host='0.0.0.0', port=8081, ssl_context=context)
     main()

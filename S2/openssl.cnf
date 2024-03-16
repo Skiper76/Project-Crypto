@@ -1,0 +1,26 @@
+[ req ]
+default_bits       = 409
+default_keyfile    = key.pem
+distinguished_name = req_distinguished_name
+req_extensions     = req_ext
+x509_extensions    = v3_req
+prompt             = no
+
+[ req_distinguished_name ]
+countryName                = US
+stateOrProvinceName        = California
+localityName               = San Francisco
+organizationName           = My Company
+organizationalUnitName     = My Division
+commonName                 = hsm
+emailAddress               = email@example.com
+
+[ req_ext ]
+subjectAltName = @alt_names
+
+[ v3_req ]
+subjectAltName = @alt_names
+
+[ alt_names ]
+DNS.1   = hsm
+DNS.2   = localhost

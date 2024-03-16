@@ -1,6 +1,4 @@
-#File "hsm.py" in ./S2
-from flask import Flask, request, jsonify 
-import ssl
+from flask import Flask, request, jsonify
 import tink
 from tink import aead
 
@@ -29,6 +27,5 @@ def decrypt():
     return jsonify({'decrypted': plaintext.hex()})
 
 if __name__ == '__main__':
-    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    ssl_context.load_cert_chain('cert.pem', 'key.pem')
-    app.run(host='0.0.0.0', port=8081, ssl_context=ssl_context)
+    app.run(host='0.0.0.0', port=8081, ssl_context=('/app/cert.pem', '/app/key.pem'))
+
