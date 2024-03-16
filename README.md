@@ -31,7 +31,6 @@ For cryptographic functions, the Google Tink library must be utilized, except fo
     └── openssl.cnf
 ```
 
-https://path-to-your-image
 
 ## Our User Interface Application (S1)
 
